@@ -7,7 +7,7 @@
 <title>Alphabet Correlations</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@400;600&family=STIX+Two+Text:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 /* Layout: a lab notebook — one square scatter plot beside a slim instrument panel, the 26-letter run tracked as a strip below. */
 :root {
@@ -26,6 +26,7 @@
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --glyph: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --math: "STIX Two Text", "Cambria Math", Cambria, Georgia, serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -121,6 +122,31 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dot); outli
 .board .nm { overflow-wrap: anywhere; }
 .boardwrap { overflow-x: auto; }
 .status { font-size: 13px; color: var(--muted); margin: 0; }
+.iconbtn { width: 34px; height: 34px; padding: 0; border-radius: 999px; background: transparent; color: var(--ink); border: 1px solid var(--rule); font-family: var(--display); font-weight: 800; font-size: 17px; line-height: 1; align-self: center; }
+.iconbtn:hover { border-color: var(--ink); }
+.linkbtn { background: none; border: none; padding: 0; color: var(--dot); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.howlink { margin: 14px 0 0; font-size: 14px; color: var(--muted); }
+dialog#howto { width: min(680px, calc(100% - 32px)); max-height: calc(100% - 32px); padding: 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); overflow: auto; box-shadow: 0 24px 60px rgb(0 0 0 / .25); }
+dialog#howto::backdrop { background: rgb(8 12 18 / .55); }
+.howto-inner { padding: 22px 24px 26px; display: flex; flex-direction: column; gap: 14px; }
+.howto-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.howto-inner h2 { font-family: var(--display); font-weight: 800; font-size: 26px; margin: 0; line-height: 1.1; }
+.howto-inner h3 { font-family: var(--display); font-weight: 800; font-size: 18px; margin: 8px 0 0; }
+.howto-inner p, .howto-inner ol { margin: 0; max-width: 62ch; }
+.howto-inner ol { padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; }
+.examples { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .examples { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.examples figure { margin: 0; display: flex; flex-direction: column; gap: 4px; text-align: center; }
+.examples canvas { width: 100%; aspect-ratio: 1; display: block; border: 1px solid var(--grid); border-radius: 4px; background: var(--bg); }
+.examples b { font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+.examples figcaption { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.formula { font-family: var(--math); font-size: 21px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 16px; background: var(--bg); border-radius: 6px; overflow-x: auto; }
+.formula i { font-style: italic; }
+.frac { display: inline-flex; flex-direction: column; align-items: center; }
+.frac > span { padding: 2px 6px; white-space: nowrap; }
+.frac > span:first-child { border-bottom: 1.5px solid var(--ink); }
+.bar { text-decoration: overline; text-decoration-thickness: 1px; }
+.where { font-size: 14px; color: var(--muted); }
 .foot { font-size: 13px; color: var(--muted); margin: 0; }
 .foot a { color: inherit; }
 </style>
@@ -133,6 +159,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dot); outli
       <p class="lede">Each scatter plot is a letter drawn in dots. Guess Pearson's <i>r</i> between x and y, A through Z, in one run.</p>
     </div>
     <div class="score" aria-live="polite">
+      <button type="button" class="iconbtn" id="helpBtn" aria-label="How to play" title="How to play" hidden>?</button>
       <div class="player" id="playerBox" hidden>Player<b id="playerName"></b><span id="saveState"></span></div>
       <div>Score<b id="scoreVal">0</b></div>
       <div>Mean error<b id="maeVal">–</b></div>
@@ -148,6 +175,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dot); outli
         <button type="submit" id="nameBtn">Start or continue</button>
       </form>
       <p class="formnote" id="nameNote"></p>
+      <p class="howlink">New to correlation? <button type="button" class="linkbtn" id="howtoOpen">How to play</button></p>
     </div>
     <canvas id="preview" width="300" height="300" aria-label="Example scatter plot of the letter R"></canvas>
   </section>
@@ -206,6 +234,42 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--dot); outli
   <p class="foot">Inspired by <a href="https://guessthecorrelation.com" target="_blank" rel="noopener">Guess the Correlation</a>. Points are sampled from the filled pixels of each glyph, with y pointing up. Enter guesses and moves to the next unanswered letter; click any letter in the strip to jump to it. Refresh the page to sign out; sign in with the same name to continue.</p>
 </div>
 
+<dialog id="howto" aria-labelledby="howtoTitle">
+  <div class="howto-inner">
+    <div class="howto-head">
+      <h2 id="howtoTitle">How to play</h2>
+      <button type="button" class="iconbtn" id="howtoClose" aria-label="Close">×</button>
+    </div>
+    <ol>
+      <li>Sign in with a name. Each guess is saved as you go, so you can close the tab and sign in with the same name to continue.</li>
+      <li>Each plot is a letter drawn in 1,000 dots. Estimate the correlation <i>r</i> between x and y, from −1 to +1, with the slider or by typing a number.</li>
+      <li>Press Enter to lock in your guess. You then see the true <i>r</i> and the best-fit line. Locked guesses can't be changed.</li>
+      <li>Answer all 26 letters, in any order, to join the leaderboard. It ranks players by mean squared error: the average of your squared misses, so lower is better and big misses cost the most.</li>
+    </ol>
+
+    <h3>What correlation means</h3>
+    <p>Correlation measures how closely the points follow a straight line. Pearson's <i>r</i> runs from −1 to +1. At +1 every point sits on a rising line, at −1 on a falling line, and near 0 there is no straight-line trend at all.</p>
+    <div class="examples" id="examples">
+      <figure><canvas data-r="-1" aria-label="Example plot with r = −1"></canvas><b>−1</b><figcaption>perfect negative</figcaption></figure>
+      <figure><canvas data-r="-0.5" aria-label="Example plot with r = −0.5"></canvas><b>−0.5</b><figcaption>moderate negative</figcaption></figure>
+      <figure><canvas data-r="0" aria-label="Example plot with r = 0"></canvas><b>0</b><figcaption>no linear trend</figcaption></figure>
+      <figure><canvas data-r="0.5" aria-label="Example plot with r = +0.5"></canvas><b>+0.5</b><figcaption>moderate positive</figcaption></figure>
+      <figure><canvas data-r="1" aria-label="Example plot with r = +1"></canvas><b>+1</b><figcaption>perfect positive</figcaption></figure>
+    </div>
+    <p>The steepness of the line doesn't matter, only how tightly the points hug it. A shape can also be very orderly and still have <i>r</i> near 0: the letter O is a ring, and its rising and falling halves cancel out.</p>
+
+    <h3>The formula</h3>
+    <div class="formula" role="math" aria-label="r equals the sum over all points of (x minus x-bar) times (y minus y-bar), divided by the square root of the sum of (x minus x-bar) squared times the sum of (y minus y-bar) squared">
+      <i>r</i><span>=</span>
+      <span class="frac">
+        <span>Σ (<i>x</i><sub><i>i</i></sub> − <i class="bar">x</i>)(<i>y</i><sub><i>i</i></sub> − <i class="bar">y</i>)</span>
+        <span>√<span style="border-top:1.5px solid var(--ink);padding-top:2px">Σ (<i>x</i><sub><i>i</i></sub> − <i class="bar">x</i>)² · Σ (<i>y</i><sub><i>i</i></sub> − <i class="bar">y</i>)²</span></span>
+      </span>
+    </div>
+    <p class="where"><i class="bar">x</i> and <i class="bar">y</i> are the averages of the x and y values, and each sum runs over every point. In words: <i>r</i> is the covariance of x and y divided by the product of their standard deviations. The top is positive when points above average in x tend to be above average in y, and the bottom scales the result to sit between −1 and +1.</p>
+  </div>
+</dialog>
+
 <script>
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const $ = id => document.getElementById(id);
@@ -256,6 +320,34 @@ function build(seed) {
   });
 }
 
+// Exact-r examples: orthogonalise noise against x, then mix so the sample correlation is exactly r.
+function examplePoints(r, seed) {
+  const rng = mulberry32(seed), n = 160;
+  const normal = () => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+  let x = Array.from({ length: n }, normal), z = Array.from({ length: n }, normal);
+  const centre = a => { const m = a.reduce((s, v) => s + v, 0) / n; return a.map(v => v - m); };
+  const norm = a => Math.sqrt(a.reduce((s, v) => s + v * v, 0));
+  x = centre(x); z = centre(z);
+  const k = x.reduce((s, v, i) => s + v * z[i], 0) / (norm(x) ** 2);
+  z = z.map((v, i) => v - k * x[i]);
+  const nx = norm(x), nz = norm(z);
+  const y = x.map((v, i) => r * v / nx + Math.sqrt(1 - r * r) * z[i] / nz);
+  const scale = a => { const lo = Math.min(...a), hi = Math.max(...a); return a.map(v => (v - lo) / (hi - lo || 1)); };
+  const sx = scale(x), sy = scale(y);
+  return sx.map((v, i) => [v, sy[i]]);
+}
+let examples = null;
+function drawExamples() {
+  if (!$('howto').open) return;
+  if (!examples) examples = {};
+  document.querySelectorAll('#examples canvas').forEach((cv, i) => {
+    const r = +cv.dataset.r;
+    if (!examples[r]) { const pts = examplePoints(r, 4242 + i); examples[r] = { pts, fit: pearson(pts) }; }
+    drawScatter(cv, examples[r], { small: true, fit: true, rad: 1.7 });
+  });
+}
+function openHowto() { const d = $('howto'); if (!d.open) d.showModal(); drawExamples(); }
+
 function band(err) { return err <= 0.05 ? 'good' : err <= 0.15 ? 'ok' : 'bad'; }
 function pointsFor(err) { return Math.max(0, Math.round(100 - err * 200)); }
 const fmt = v => (v < 0 ? '−' : v > 0 ? '+' : '') + Math.abs(v).toFixed(2);
@@ -281,7 +373,7 @@ function drawScatter(cv, round, opts = {}) {
   }
   const m = 0.06, X = x => pad + inner * (m + x * (1 - 2 * m)), Y = y => pad + inner * (1 - (m + y * (1 - 2 * m)));
   g.fillStyle = css('--dot'); g.globalAlpha = 0.75;
-  const rad = opts.small ? 0.7 : Math.max(1.5, w / 290);
+  const rad = opts.rad || (opts.small ? 0.7 : Math.max(1.5, w / 290));
   for (const [x, y] of round.pts) { g.beginPath(); g.arc(X(x), Y(y), rad, 0, Math.PI * 2); g.fill(); }
   g.globalAlpha = 1;
   if (opts.fit) {
@@ -488,7 +580,7 @@ $('nameForm').addEventListener('submit', async e => {
     }
     $('nameBtn').disabled = false; $('nameNote').textContent = '';
   }
-  $('playerName').textContent = player; $('playerBox').hidden = false;
+  $('playerName').textContent = player; $('playerBox').hidden = false; $('helpBtn').hidden = false;
   const done = guesses ? guesses.filter(g => g != null).length : 0;
   setSaveState(done ? `Welcome back · ${done} of 26 saved` : online() ? 'New player' : 'Offline: progress not saved', !online());
   newGame(guesses);
@@ -520,10 +612,15 @@ $('strip').addEventListener('click', e => {
   renderRound();
 });
 function nextOpen() { for (let k = 1; k <= 26; k++) { const j = (state.idx + k) % 26; if (state.guesses[j] == null) return j; } return -1; }
+$('howtoOpen').addEventListener('click', openHowto);
+$('helpBtn').addEventListener('click', openHowto);
+$('howtoClose').addEventListener('click', () => $('howto').close());
+// Clicks on the dimmed backdrop land on the <dialog> itself; clicks inside land on its content.
+$('howto').addEventListener('click', e => { if (e.target === $('howto')) $('howto').close(); });
 $('boardRefresh').addEventListener('click', () => { if (!lastEntry) return; if (state.saved) loadBoard(); else saveAndRank({ mse: lastEntry.mse, mae: lastEntry.mae, pts: lastEntry.score }); });
 $('againBtn').addEventListener('click', () => { location.reload(); });
 
-function redraw() { if (!state) { if (rounds.length) drawScatter($('preview'), rounds[17], {}); return; } if (state.over) drawResultsCanvases(); else drawScatter($('plot'), rounds[state.idx], { fit: state.guesses[state.idx] != null }); }
+function redraw() { drawExamples(); if (!state) { if (rounds.length) drawScatter($('preview'), rounds[17], {}); return; } if (state.over) drawResultsCanvases(); else drawScatter($('plot'), rounds[state.idx], { fit: state.guesses[state.idx] != null }); }
 window.addEventListener('resize', redraw);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
 new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
