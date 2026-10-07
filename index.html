@@ -147,6 +147,11 @@ dialog#howto::backdrop { background: rgb(8 12 18 / .55); }
 .frac > span:first-child { border-bottom: 1.5px solid var(--ink); }
 .bar { text-decoration: overline; text-decoration-thickness: 1px; }
 .where { font-size: 14px; color: var(--muted); }
+.crowd { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; border-top: 1px dashed var(--rule); padding-top: 12px; margin-top: 4px; }
+.crowd .eyebrow { font-size: 11px; }
+#crowdPlot { width: 100%; height: 104px; display: block; }
+.crowdtext { font-family: var(--body); font-size: 13px; color: var(--muted); margin: 0; line-height: 1.45; }
+.crowdtext b { color: var(--ink); font-family: var(--mono); font-size: 13px; font-weight: 600; }
 .foot { font-size: 13px; color: var(--muted); margin: 0; }
 .foot a { color: inherit; }
 </style>
@@ -203,6 +208,11 @@ dialog#howto::backdrop { background: rgb(8 12 18 / .55); }
         <div><span>You</span><b id="youR">–</b></div>
         <div><span>Error</span><b id="errR">–</b></div>
         <p class="verdict" id="verdict"></p>
+        <div class="crowd" id="crowdBox" hidden>
+          <p class="eyebrow">How everyone else guessed this letter</p>
+          <canvas id="crowdPlot" aria-label="Histogram of other players' guesses for this letter"></canvas>
+          <p class="crowdtext" id="crowdText"></p>
+        </div>
       </div>
     </div>
   </section>
@@ -349,6 +359,70 @@ function drawExamples() {
 }
 function openHowto() { const d = $('howto'); if (!d.open) d.showModal(); drawExamples(); }
 
+// Other players' guesses (all letters), refreshed after sign-in and after each locked guess.
+let crowd = [];
+async function loadCrowd() {
+  if (!online()) return;
+  try {
+    const rows = await api(`players?select=id,guesses&seed=eq.${SEED}&limit=1000`);
+    crowd = rows.filter(r => r.id !== playerKey && Array.isArray(r.guesses)).map(r => r.guesses);
+  } catch (e) { console.error(e); }
+}
+
+function crowdFor(i) { return crowd.map(g => g[i]).filter(v => typeof v === 'number'); }
+
+function renderCrowd() {
+  const box = $('crowdBox');
+  if (!state || !online() || state.guesses[state.idx] == null) { box.hidden = true; return; }
+  const i = state.idx, truth = rounds[i].fit.r, mine = state.guesses[i], vals = crowdFor(i);
+  box.hidden = false;
+  if (!vals.length) {
+    $('crowdPlot').hidden = true;
+    $('crowdText').textContent = `No one else has answered ${LETTERS[i]} yet. Check back once friends have played.`;
+    return;
+  }
+  $('crowdPlot').hidden = false;
+  const sq = v => (v - truth) ** 2, mySq = sq(mine);
+  const theirMse = vals.reduce((a, v) => a + sq(v), 0) / vals.length;
+  const mean = vals.reduce((a, v) => a + v, 0) / vals.length;
+  const beat = Math.round(100 * vals.filter(v => sq(v) > mySq + 1e-12).length / vals.length);
+  const n = vals.length;
+  $('crowdText').innerHTML = `${n} other player${n === 1 ? '' : 's'} · average guess <b>${fmt(mean)}</b> · their mean squared error <b>${theirMse.toFixed(3)}</b>, yours <b>${mySq.toFixed(3)}</b>. You were closer than <b>${beat}%</b> of them.`;
+  drawCrowd(vals, truth, mine);
+}
+
+function drawCrowd(vals, truth, mine) {
+  const cv = $('crowdPlot'), dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (!w) return;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const padX = 10, top = 18, bottom = h - 16, X = v => padX + (v + 1) / 2 * (w - 2 * padX);
+  const B = 20, counts = Array(B).fill(0), bin = v => Math.min(B - 1, Math.floor((v + 1) / 2 * B));
+  vals.forEach(v => counts[bin(v)]++);
+  const max = Math.max(...counts), bw = (w - 2 * padX) / B, myBin = bin(mine);
+  counts.forEach((c, k) => {
+    if (!c) return;
+    const bh = (bottom - top) * c / max;
+    g.fillStyle = css(k === myBin ? '--dot' : '--rule');
+    g.fillRect(padX + k * bw + 1, bottom - bh, bw - 2, bh);
+  });
+  g.strokeStyle = css('--grid'); g.beginPath(); g.moveTo(padX, bottom + 0.5); g.lineTo(w - padX, bottom + 0.5); g.stroke();
+  g.fillStyle = css('--muted'); g.font = '10px "IBM Plex Mono", monospace'; g.textBaseline = 'alphabetic';
+  [[-1, 'left', '−1'], [0, 'center', '0'], [1, 'right', '+1']].forEach(([v, a, t]) => { g.textAlign = a; g.fillText(t, X(v), h - 3); });
+  const mark = (v, color, label, dash) => {
+    g.strokeStyle = color; g.lineWidth = 2; g.setLineDash(dash); g.beginPath(); g.moveTo(X(v), top - 4); g.lineTo(X(v), bottom); g.stroke(); g.setLineDash([]);
+    g.fillStyle = color; g.font = '600 10px "IBM Plex Mono", monospace';
+    g.textAlign = X(v) < 40 ? 'left' : X(v) > w - 40 ? 'right' : 'center';
+    return [X(v), label];
+  };
+  const a = mark(truth, css('--fit'), 'true r', [4, 3]), b = mark(mine, css('--dot'), 'you', []);
+  // keep the two labels from overlapping when the guess sits next to the truth
+  const close = Math.abs(a[0] - b[0]) < 44;
+  g.textBaseline = 'alphabetic';
+  g.fillStyle = css('--fit'); g.textAlign = close ? (a[0] <= b[0] ? 'right' : 'left') : 'center'; g.fillText('true r', a[0] + (close ? (a[0] <= b[0] ? -4 : 4) : 0), 11);
+  g.fillStyle = css('--dot'); g.textAlign = close ? (a[0] <= b[0] ? 'left' : 'right') : 'center'; g.fillText('you', b[0] + (close ? (a[0] <= b[0] ? 4 : -4) : 0), 11);
+}
+
 function band(err) { return err <= 0.05 ? 'good' : err <= 0.15 ? 'ok' : 'bad'; }
 function pointsFor(err) { return Math.max(0, Math.round(100 - err * 200)); }
 const fmt = v => (v < 0 ? '−' : v > 0 ? '+' : '') + Math.abs(v).toFixed(2);
@@ -425,9 +499,10 @@ function renderRound() {
     const gs = state.guesses[state.idx], e = Math.abs(gs - r.fit.r), b = band(e);
     $('trueR').textContent = fmt(r.fit.r); $('youR').textContent = fmt(gs); $('errR').textContent = e.toFixed(2);
     const words = { good: 'Sharp.', ok: 'Close.', bad: 'Off the mark.' };
-    $('verdict').innerHTML = `<span class="tag c-${b}">+${pointsFor(e)}</span>${words[b]} The orange line is the least-squares fit.`;
+    $('verdict').innerHTML = `<span class="tag c-${b}">+${pointsFor(e)}</span>${words[b]} The orange line is the line of best fit.`;
     const n = nextOpen();
     $('actBtn').textContent = n < 0 ? 'See results' : `Next: ${LETTERS[n]}`;
+    renderCrowd();
   } else {
     $('actBtn').textContent = 'Guess';
     setGuess(0);
@@ -585,6 +660,7 @@ $('nameForm').addEventListener('submit', async e => {
   const done = guesses ? guesses.filter(g => g != null).length : 0;
   setSaveState(done ? `Welcome back · ${done} of 26 saved` : online() ? 'New player' : 'Offline: progress not saved', !online());
   newGame(guesses);
+  loadCrowd().then(() => { if (!state.over) renderCrowd(); });
   if (finished || done === 26) { state.saved = finished; state.over = true; renderResults(); return; }
   $('guessNum').focus(); $('guessNum').select();
 });
@@ -600,6 +676,7 @@ $('guessForm').addEventListener('submit', e => {
     state.guesses[state.idx] = Math.round(v * 100) / 100;
     renderRound(); $('actBtn').focus();
     savePlayer({ guesses: state.guesses });
+    loadCrowd().then(renderCrowd);
   } else {
     const n = nextOpen();
     if (n < 0) { state.over = true; renderResults(); }
@@ -621,7 +698,7 @@ $('howto').addEventListener('click', e => { if (e.target === $('howto')) $('howt
 $('boardRefresh').addEventListener('click', () => { if (!lastEntry) return; if (state.saved) loadBoard(); else saveAndRank({ mse: lastEntry.mse, mae: lastEntry.mae, pts: lastEntry.score }); });
 $('againBtn').addEventListener('click', () => { location.reload(); });
 
-function redraw() { drawExamples(); if (!state) { if (rounds.length) drawScatter($('preview'), rounds[17], {}); return; } if (state.over) drawResultsCanvases(); else drawScatter($('plot'), rounds[state.idx], { fit: state.guesses[state.idx] != null }); }
+function redraw() { drawExamples(); if (!state) { if (rounds.length) drawScatter($('preview'), rounds[17], {}); return; } if (state.over) drawResultsCanvases(); else { drawScatter($('plot'), rounds[state.idx], { fit: state.guesses[state.idx] != null }); renderCrowd(); } }
 window.addEventListener('resize', redraw);
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
 new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
