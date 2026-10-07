@@ -243,7 +243,7 @@ dialog#howto::backdrop { background: rgb(8 12 18 / .55); }
     <ol>
       <li>Sign in with a name. Each guess is saved as you go, so you can close the tab and sign in with the same name to continue.</li>
       <li>Each plot is a letter drawn in 1,000 dots. Estimate the correlation <i>r</i> between x and y, from −1 to +1, with the slider or by typing a number.</li>
-      <li>Press Enter to lock in your guess. You then see the true <i>r</i> and the best-fit line. Locked guesses can't be changed.</li>
+      <li>Press Enter to lock in your guess. You then see the true <i>r</i> and the line of best fit. Locked guesses can't be changed.</li>
       <li>Answer all 26 letters, in any order, to join the leaderboard. It ranks players by mean squared error: the average of your squared misses, so lower is better and big misses cost the most.</li>
     </ol>
 
@@ -256,7 +256,8 @@ dialog#howto::backdrop { background: rgb(8 12 18 / .55); }
       <figure><canvas data-r="0.5" aria-label="Example plot with r = +0.5"></canvas><b>+0.5</b><figcaption>moderate positive</figcaption></figure>
       <figure><canvas data-r="1" aria-label="Example plot with r = +1"></canvas><b>+1</b><figcaption>perfect positive</figcaption></figure>
     </div>
-    <p>The steepness of the line doesn't matter, only how tightly the points hug it. A shape can also be very orderly and still have <i>r</i> near 0: the letter O is a ring, and its rising and falling halves cancel out.</p>
+    <p>The orange line in each plot is the line of best fit: the straight line that keeps the squared vertical distances from the points to the line as small as possible (least-squares regression). The quiz shows it for each letter once you lock in a guess.</p>
+    <p>The steepness of that line doesn't decide <i>r</i>; what matters is how tightly the points hug it. A shape can also be very orderly and still have <i>r</i> near 0: the letter O is a ring, and its rising and falling halves cancel out.</p>
 
     <h3>The formula</h3>
     <div class="formula" role="math" aria-label="r equals the sum over all points of (x minus x-bar) times (y minus y-bar), divided by the square root of the sum of (x minus x-bar) squared times the sum of (y minus y-bar) squared">
