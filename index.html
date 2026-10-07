@@ -230,7 +230,7 @@ function letterPoints(ch, rng) {
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, S / 2, S / 2);
   const d = g.getImageData(0, 0, S, S).data, filled = [];
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (d[(y * S + x) * 4 + 3] > 140) filled.push([x, y]);
-  const n = 420 + Math.floor(rng() * 160), raw = [];
+  const n = 1000, raw = []; // a fixed, large sample keeps each plot's r close to the glyph's true shape
   for (let i = 0; i < n; i++) {
     const [x, y] = filled[Math.floor(rng() * filled.length)];
     raw.push([x + rng() - 0.5, -(y + rng() - 0.5)]);
@@ -280,8 +280,8 @@ function drawScatter(cv, round, opts = {}) {
     g.save(); g.translate(14, pad); g.rotate(-Math.PI / 2); g.textAlign = 'right'; g.fillText('y →', 0, 0); g.restore();
   }
   const m = 0.06, X = x => pad + inner * (m + x * (1 - 2 * m)), Y = y => pad + inner * (1 - (m + y * (1 - 2 * m)));
-  g.fillStyle = css('--dot'); g.globalAlpha = 0.85;
-  const rad = opts.small ? 1 : Math.max(2, w / 210);
+  g.fillStyle = css('--dot'); g.globalAlpha = 0.75;
+  const rad = opts.small ? 0.7 : Math.max(1.5, w / 290);
   for (const [x, y] of round.pts) { g.beginPath(); g.arc(X(x), Y(y), rad, 0, Math.PI * 2); g.fill(); }
   g.globalAlpha = 1;
   if (opts.fit) {
