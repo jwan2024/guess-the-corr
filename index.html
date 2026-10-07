@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Guess the correlation of scatter plots shaped like each letter of the alphabet.">
+<title>Alphabet Correlations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a lab notebook — one square scatter plot beside a slim instrument panel, the 26-letter run tracked as a strip below. */
+:root {
+  --bg: #e9edf1;
+  --paper: #f7f9fb;
+  --ink: #15202b;
+  --muted: #5d6b79;
+  --rule: #c9d2db;
+  --grid: #dde3ea;
+  --dot: #2741c9;
+  --fit: #d9480f;
+  --good: #1f8a4c;
+  --ok: #b7791f;
+  --bad: #c0392b;
+  --display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --glyph: "Archivo", "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151b; --paper: #161e26; --ink: #e6ecf2; --muted: #93a1b0; --rule: #2b3743; --grid: #222c36;
+    --dot: #7d95ff; --fit: #ff8a4c; --good: #4cc17f; --ok: #e0aa4a; --bad: #ef6b5b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151b; --paper: #161e26; --ink: #e6ecf2; --muted: #93a1b0; --rule: #2b3743; --grid: #222c36;
+  --dot: #7d95ff; --fit: #ff8a4c; --good: #4cc17f; --ok: #e0aa4a; --bad: #ef6b5b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { color-scheme: light; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 48px; display: flex; flex-direction: column; gap: 24px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(28px, 5vw, 44px); line-height: 1; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h1 em { font-style: normal; color: var(--dot); }
+.lede { margin: 0; color: var(--muted); max-width: 52ch; }
+.score { font-family: var(--mono); font-size: 13px; color: var(--muted); display: flex; gap: 18px; font-variant-numeric: tabular-nums; }
+.score b { color: var(--ink); font-weight: 600; font-size: 18px; display: block; }
+
+.game { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 720px) { .game { grid-template-columns: 1fr; } }
+.plotbox { background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; }
+#plot { width: 100%; aspect-ratio: 1; display: block; max-width: 100%; }
+
+.panel { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.bigletter { font-family: var(--glyph); font-weight: 600; font-size: 64px; line-height: 1; margin: 4px 0 0; }
+.prompt { margin: 0; }
+.guessrow { display: flex; gap: 10px; align-items: center; }
+#guessSlider { flex: 1; min-width: 0; accent-color: var(--dot); }
+#guessNum { width: 6.5em; font-family: var(--mono); font-size: 18px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); color: var(--ink); font-variant-numeric: tabular-nums; }
+.scale { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: -10px; }
+button { font-family: var(--body); font-weight: 600; font-size: 15px; border-radius: 4px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); padding: 10px 18px; cursor: pointer; }
+button.secondary { background: transparent; color: var(--ink); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--dot); outline-offset: 2px; }
+.reveal { border-top: 1px solid var(--rule); padding-top: 14px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.reveal span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; display: block; }
+.reveal b { font-size: 22px; font-weight: 600; }
+.verdict { grid-column: 1 / -1; font-family: var(--body); font-size: 14px; margin: 4px 0 0; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; color: var(--paper); margin-right: 6px; text-transform: uppercase; letter-spacing: .05em; }
+[hidden] { display: none !important; }
+.reveal .tag { display: inline-block; font-size: 11px; color: var(--paper); text-transform: uppercase; letter-spacing: .05em; }
+.c-good { --c: var(--good); } .c-ok { --c: var(--ok); } .c-bad { --c: var(--bad); }
+.tag { background: var(--c, var(--muted)); }
+
+.strip { display: grid; grid-template-columns: repeat(13, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 520px) { .strip { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+.chip { font-family: var(--glyph); font-weight: 600; font-size: 15px; text-align: center; padding: 6px 0 4px; border: 1px solid var(--rule); border-radius: 4px; color: var(--muted); background: transparent; line-height: 1.1; }
+.chip small { display: block; font-family: var(--mono); font-size: 10px; font-weight: 400; min-height: 1.2em; font-variant-numeric: tabular-nums; }
+.chip.done { background: var(--c); border-color: var(--c); color: var(--paper); }
+.chip { cursor: pointer; width: 100%; }
+.chip:hover { border-color: var(--ink); color: var(--ink); }
+.chip.current { outline: 2px solid var(--ink); outline-offset: 1px; color: var(--ink); }
+
+.results { display: flex; flex-direction: column; gap: 20px; }
+.results h2 { font-family: var(--display); font-weight: 800; font-size: 30px; margin: 0; line-height: 1.1; text-wrap: balance; }
+.summary { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 720px) { .summary { grid-template-columns: 1fr; } }
+.summary p { margin: 0 0 10px; max-width: 60ch; }
+#calib { width: 100%; aspect-ratio: 1; max-width: 360px; display: block; }
+.grid26 { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.card { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.card canvas { width: 100%; aspect-ratio: 1; display: block; }
+.card .row { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+.card .row b { font-family: var(--glyph); font-size: 14px; font-weight: 600; }
+.err { color: var(--c); font-weight: 600; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.signin { background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 28px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: center; }
+@media (max-width: 720px) { .signin { grid-template-columns: 1fr; padding: 20px; } }
+.signin h2 { font-family: var(--display); font-weight: 800; font-size: 28px; margin: 0 0 8px; line-height: 1.1; }
+.signin p { margin: 0 0 14px; color: var(--muted); max-width: 48ch; }
+.signin form { display: flex; gap: 10px; flex-wrap: wrap; }
+#nameInput { flex: 1 1 12em; min-width: 0; font-family: var(--body); font-size: 17px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px; background: var(--bg); color: var(--ink); }
+.formnote { font-size: 13px; color: var(--bad); margin: 8px 0 0; min-height: 1.3em; }
+#preview { width: 100%; max-width: 300px; aspect-ratio: 1; display: block; justify-self: center; }
+.player { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.player b { color: var(--ink); font-weight: 600; }
+#saveState { display: block; font-size: 11px; min-height: 1.2em; }
+#saveState.warn { color: var(--bad); }
+.rankbox { display: flex; flex-direction: column; gap: 10px; }
+.rankline { font-family: var(--display); font-weight: 800; font-size: 22px; margin: 0; line-height: 1.2; }
+.board { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+.board th { text-align: left; font-family: var(--mono); font-size: 11px; font-weight: 400; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-bottom: 1px solid var(--rule); padding: 6px 8px; }
+.board td { padding: 6px 8px; border-bottom: 1px solid var(--grid); }
+.board td.num, .board th.num { text-align: right; font-family: var(--mono); }
+.board tr.me td { background: color-mix(in srgb, var(--dot) 14%, transparent); font-weight: 600; }
+.board .nm { overflow-wrap: anywhere; }
+.boardwrap { overflow-x: auto; }
+.status { font-size: 13px; color: var(--muted); margin: 0; }
+.foot { font-size: 13px; color: var(--muted); margin: 0; }
+.foot a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Alphabet <em>Correlations</em></h1>
+      <p class="lede">Each scatter plot is a letter drawn in dots. Guess Pearson's <i>r</i> between x and y, A through Z, in one run.</p>
+    </div>
+    <div class="score" aria-live="polite">
+      <div class="player" id="playerBox" hidden>Player<b id="playerName"></b><span id="saveState"></span></div>
+      <div>Score<b id="scoreVal">0</b></div>
+      <div>Mean error<b id="maeVal">–</b></div>
+    </div>
+  </header>
+
+  <section class="signin" id="signin">
+    <div>
+      <h2>Sign in with a name</h2>
+      <p>Everyone gets the same 26 scatter plots. Each guess is saved under your name, so you can close the tab and sign in again later to pick up where you left off. When you finish, your mean squared error goes on the leaderboard.</p>
+      <form id="nameForm" autocomplete="off">
+        <input id="nameInput" type="text" maxlength="24" placeholder="Your name" aria-label="Your name">
+        <button type="submit" id="nameBtn">Start or continue</button>
+      </form>
+      <p class="formnote" id="nameNote"></p>
+    </div>
+    <canvas id="preview" width="300" height="300" aria-label="Example scatter plot of the letter R"></canvas>
+  </section>
+
+  <section class="game" id="game" hidden>
+    <div class="plotbox"><canvas id="plot" width="600" height="600" aria-label="Scatter plot of the current letter"></canvas></div>
+    <div class="panel">
+      <div>
+        <p class="eyebrow" id="roundLabel">Letter 1 of 26</p>
+        <p class="bigletter" id="bigLetter">A</p>
+      </div>
+      <p class="prompt">What is the correlation of these points?</p>
+      <form id="guessForm" class="panel" style="gap:14px">
+        <div class="guessrow">
+          <input id="guessSlider" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Guess slider">
+          <input id="guessNum" type="text" inputmode="decimal" value="0.00" aria-label="Guess value" autocomplete="off">
+        </div>
+        <div class="scale"><span>−1</span><span>0</span><span>+1</span></div>
+        <div class="actions">
+          <button type="submit" id="actBtn">Guess</button>
+        </div>
+      </form>
+      <div class="reveal" id="reveal" hidden>
+        <div><span>True r</span><b id="trueR">–</b></div>
+        <div><span>You</span><b id="youR">–</b></div>
+        <div><span>Error</span><b id="errR">–</b></div>
+        <p class="verdict" id="verdict"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="results" id="results" hidden>
+    <h2 id="resTitle"></h2>
+    <div class="rankbox">
+      <p class="eyebrow">Leaderboard · ranked by mean squared error, lower is better</p>
+      <p class="rankline" id="rankLine">Saving your score…</p>
+      <p class="status" id="boardStatus"></p>
+      <div class="actions"><button type="button" class="secondary" id="boardRefresh">Refresh leaderboard</button></div>
+      <div class="boardwrap"><table class="board"><thead><tr><th class="num">#</th><th>Name</th><th class="num">MSE</th><th class="num">Mean error</th><th class="num">Score</th></tr></thead><tbody id="boardBody"></tbody></table></div>
+    </div>
+    <div class="summary">
+      <div>
+        <p id="resText"></p>
+        <p id="resExtremes"></p>
+        <div class="actions"><button id="againBtn" type="button" class="secondary">Sign out</button></div>
+      </div>
+      <div>
+        <p class="eyebrow" style="margin-bottom:6px">Your guess vs. the truth</p>
+        <canvas id="calib" width="360" height="360" aria-label="Your guesses plotted against true correlations"></canvas>
+      </div>
+    </div>
+    <div class="grid26" id="grid26"></div>
+  </section>
+
+  <div class="strip" id="strip" hidden></div>
+  <p class="foot">Inspired by <a href="https://guessthecorrelation.com" target="_blank" rel="noopener">Guess the Correlation</a>. Points are sampled from the filled pixels of each glyph, with y pointing up. Enter guesses and moves to the next unanswered letter; click any letter in the strip to jump to it. Refresh the page to sign out; sign in with the same name to continue.</p>
+</div>
+
+<script>
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function pearson(pts) {
+  const n = pts.length; let mx = 0, my = 0;
+  for (const [x, y] of pts) { mx += x; my += y; }
+  mx /= n; my /= n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (const [x, y] of pts) { const dx = x - mx, dy = y - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+  return { r: sxy / Math.sqrt(sxx * syy), mx, my, slope: sxy / sxx };
+}
+
+// Rasterise the glyph, sample filled pixels, flip y so "up" is positive, fit into the unit square.
+function letterPoints(ch, rng) {
+  const S = 240, c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.fillStyle = '#000'; g.font = '600 190px "Archivo", "Helvetica Neue", Arial, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, S / 2, S / 2);
+  const d = g.getImageData(0, 0, S, S).data, filled = [];
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (d[(y * S + x) * 4 + 3] > 140) filled.push([x, y]);
+  const n = 420 + Math.floor(rng() * 160), raw = [];
+  for (let i = 0; i < n; i++) {
+    const [x, y] = filled[Math.floor(rng() * filled.length)];
+    raw.push([x + rng() - 0.5, -(y + rng() - 0.5)]);
+  }
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [x, y] of raw) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const span = Math.max(x1 - x0, y1 - y0), ox = (span - (x1 - x0)) / 2, oy = (span - (y1 - y0)) / 2;
+  return raw.map(([x, y]) => [(x - x0 + ox) / span, (y - y0 + oy) / span]);
+}
+
+// Supabase project settings: Project URL and the publishable (or legacy anon) key.
+// The key is meant to be public; row-level security and the trigger in supabase.sql limit what it can do.
+const SUPABASE_URL = 'https://atgpvpzlegobxuelrrkn.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_KGzdVgPRoPHyTU6m0evyiw_0eODgqfD';
+const SEED = 20261006; // same dots for every player, so the leaderboard is fair
+let state = null, rounds = [], player = '', playerKey = '', myDocId = null;
+const online = () => !!(SUPABASE_URL && SUPABASE_KEY);
+
+function build(seed) {
+  rounds = LETTERS.map((ch, i) => {
+    const pts = letterPoints(ch, mulberry32(seed * 101 + i * 7919));
+    return { ch, pts, fit: pearson(pts) };
+  });
+}
+
+function band(err) { return err <= 0.05 ? 'good' : err <= 0.15 ? 'ok' : 'bad'; }
+function pointsFor(err) { return Math.max(0, Math.round(100 - err * 200)); }
+const fmt = v => (v < 0 ? '−' : v > 0 ? '+' : '') + Math.abs(v).toFixed(2);
+
+function drawScatter(cv, round, opts = {}) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth || cv.width;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(w * dpr);
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pad = opts.small ? 6 : 28, inner = w - pad * 2;
+  g.clearRect(0, 0, w, w);
+  g.strokeStyle = css('--grid'); g.lineWidth = 1;
+  const ticks = opts.small ? 2 : 4;
+  for (let i = 0; i <= ticks; i++) {
+    const p = pad + inner * i / ticks;
+    g.beginPath(); g.moveTo(pad, p); g.lineTo(w - pad, p); g.stroke();
+    g.beginPath(); g.moveTo(p, pad); g.lineTo(p, w - pad); g.stroke();
+  }
+  if (!opts.small) {
+    g.strokeStyle = css('--rule'); g.strokeRect(pad, pad, inner, inner);
+    g.fillStyle = css('--muted'); g.font = '11px "IBM Plex Mono", monospace';
+    g.textAlign = 'right'; g.fillText('x →', w - pad, w - 8);
+    g.save(); g.translate(14, pad); g.rotate(-Math.PI / 2); g.textAlign = 'right'; g.fillText('y →', 0, 0); g.restore();
+  }
+  const m = 0.06, X = x => pad + inner * (m + x * (1 - 2 * m)), Y = y => pad + inner * (1 - (m + y * (1 - 2 * m)));
+  g.fillStyle = css('--dot'); g.globalAlpha = 0.85;
+  const rad = opts.small ? 1 : Math.max(2, w / 210);
+  for (const [x, y] of round.pts) { g.beginPath(); g.arc(X(x), Y(y), rad, 0, Math.PI * 2); g.fill(); }
+  g.globalAlpha = 1;
+  if (opts.fit) {
+    const { mx, my, slope } = round.fit;
+    // keep the fitted line inside the plot window
+    const yAt = x => my + slope * (x - mx), xAt = y => mx + (y - my) / slope;
+    const segs = [];
+    if (yAt(0) >= 0 && yAt(0) <= 1) segs.push([0, yAt(0)]);
+    if (yAt(1) >= 0 && yAt(1) <= 1) segs.push([1, yAt(1)]);
+    if (slope !== 0) { for (const yy of [0, 1]) { const xx = xAt(yy); if (xx > 0 && xx < 1) segs.push([xx, yy]); } }
+    if (segs.length >= 2) {
+      g.strokeStyle = css('--fit'); g.lineWidth = opts.small ? 1.5 : 2.5;
+      g.beginPath(); g.moveTo(X(segs[0][0]), Y(segs[0][1])); g.lineTo(X(segs[1][0]), Y(segs[1][1])); g.stroke();
+    }
+  }
+}
+
+function setGuess(v, from) {
+  v = Math.max(-1, Math.min(1, v));
+  if (from !== 'slider') $('guessSlider').value = v;
+  if (from !== 'num') $('guessNum').value = v.toFixed(2);
+}
+
+function renderStrip() {
+  $('strip').innerHTML = rounds.map((r, i) => {
+    const gs = state.guesses[i];
+    const cur = i === state.idx && !state.over ? ' current' : '';
+    if (gs != null) { const e = Math.abs(gs - r.fit.r); return `<button type="button" class="chip done c-${band(e)}${cur}" data-i="${i}" title="${r.ch}: true ${fmt(r.fit.r)}, you ${fmt(gs)}">${r.ch}<small>${fmt(r.fit.r)}</small></button>`; }
+    return `<button type="button" class="chip${cur}" data-i="${i}" title="Go to ${r.ch}">${r.ch}<small></small></button>`;
+  }).join('');
+}
+
+function renderScore() {
+  const done = state.guesses.map((g, i) => g == null ? null : Math.abs(g - rounds[i].fit.r)).filter(e => e != null);
+  $('scoreVal').textContent = done.reduce((s, e) => s + pointsFor(e), 0);
+  $('maeVal').textContent = done.length ? (done.reduce((s, e) => s + e, 0) / done.length).toFixed(3) : '–';
+}
+
+function renderRound() {
+  const r = rounds[state.idx], answered = state.guesses[state.idx] != null;
+  const answeredCount = state.guesses.filter(g => g != null).length;
+  $('roundLabel').textContent = `Letter ${state.idx + 1} of 26 · ${answeredCount} answered`;
+  $('bigLetter').textContent = r.ch;
+  drawScatter($('plot'), r, { fit: answered });
+  $('reveal').hidden = !answered;
+  $('guessSlider').disabled = $('guessNum').disabled = answered;
+  if (answered) {
+    const gs = state.guesses[state.idx], e = Math.abs(gs - r.fit.r), b = band(e);
+    $('trueR').textContent = fmt(r.fit.r); $('youR').textContent = fmt(gs); $('errR').textContent = e.toFixed(2);
+    const words = { good: 'Sharp.', ok: 'Close.', bad: 'Off the mark.' };
+    $('verdict').innerHTML = `<span class="tag c-${b}">+${pointsFor(e)}</span>${words[b]} The orange line is the least-squares fit.`;
+    const n = nextOpen();
+    $('actBtn').textContent = n < 0 ? 'See results' : `Next: ${LETTERS[n]}`;
+  } else {
+    $('actBtn').textContent = 'Guess';
+    setGuess(0);
+  }
+  renderStrip(); renderScore();
+}
+
+function renderResults() {
+  $('game').hidden = true; $('results').hidden = false;
+  const errs = rounds.map((r, i) => Math.abs(state.guesses[i] - r.fit.r));
+  const mae = errs.reduce((a, b) => a + b, 0) / 26, pts = errs.reduce((s, e) => s + pointsFor(e), 0);
+  const mse = errs.reduce((a, e) => a + e * e, 0) / 26;
+  saveAndRank({ mse, mae, pts });
+  const meta = pearson(rounds.map((r, i) => [state.guesses[i], r.fit.r])).r;
+  const title = mae < 0.06 ? 'Statistician grade' : mae < 0.12 ? 'Strong eye for slope' : mae < 0.2 ? 'Respectable reading' : 'The alphabet won this one';
+  $('resTitle').textContent = `${title}: ${pts} / 2600`;
+  $('resText').textContent = `Mean squared error ${mse.toFixed(4)}, mean absolute error ${mae.toFixed(3)} across 26 letters. Your guesses correlate with the true values at r = ${isFinite(meta) ? meta.toFixed(2) : '–'}.`;
+  const order = errs.map((e, i) => [e, i]).sort((a, b) => a[0] - b[0]);
+  const best = order[0][1], worst = order[25][1];
+  $('resExtremes').textContent = `Closest: ${LETTERS[best]} (off by ${errs[best].toFixed(2)}). Furthest: ${LETTERS[worst]} (you said ${fmt(state.guesses[worst])}, it was ${fmt(rounds[worst].fit.r)}).`;
+  $('grid26').innerHTML = rounds.map((r, i) => `<div class="card c-${band(errs[i])}"><canvas data-i="${i}"></canvas><div class="row"><b>${r.ch}</b><span>r ${fmt(r.fit.r)}</span></div><div class="row"><span>you ${fmt(state.guesses[i])}</span><span class="err">±${errs[i].toFixed(2)}</span></div></div>`).join('');
+  drawResultsCanvases();
+  renderStrip(); renderScore();
+}
+
+function drawResultsCanvases() {
+  document.querySelectorAll('#grid26 canvas').forEach(cv => drawScatter(cv, rounds[+cv.dataset.i], { small: true, fit: true }));
+  const cv = $('calib'), dpr = window.devicePixelRatio || 1, w = cv.clientWidth || 360;
+  cv.width = cv.height = Math.round(w * dpr);
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pad = 30, inner = w - pad - 12, X = v => pad + (v + 1) / 2 * inner, Y = v => 12 + (1 - (v + 1) / 2) * inner;
+  g.clearRect(0, 0, w, w);
+  g.strokeStyle = css('--grid'); g.lineWidth = 1;
+  g.fillStyle = css('--muted'); g.font = '10px "IBM Plex Mono", monospace';
+  for (const t of [-1, -0.5, 0, 0.5, 1]) {
+    g.beginPath(); g.moveTo(X(t), Y(-1)); g.lineTo(X(t), Y(1)); g.stroke();
+    g.beginPath(); g.moveTo(X(-1), Y(t)); g.lineTo(X(1), Y(t)); g.stroke();
+    g.textAlign = 'center'; g.fillText(t.toString(), X(t), w - 4);
+    g.textAlign = 'right'; g.fillText(t.toString(), pad - 4, Y(t) + 3);
+  }
+  g.strokeStyle = css('--rule'); g.setLineDash([4, 4]); g.beginPath(); g.moveTo(X(-1), Y(-1)); g.lineTo(X(1), Y(1)); g.stroke(); g.setLineDash([]);
+  g.font = '600 12px "Archivo", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  rounds.forEach((r, i) => { g.fillStyle = css('--' + band(Math.abs(state.guesses[i] - r.fit.r))); g.fillText(r.ch, X(state.guesses[i]), Y(r.fit.r)); });
+  g.textBaseline = 'alphabetic';
+}
+
+function newGame(guesses) {
+  state = { seed: SEED, idx: 0, guesses: guesses || Array(26).fill(null), over: false };
+  const first = state.guesses.findIndex(g => g == null);
+  state.idx = first < 0 ? 0 : first;
+  $('results').hidden = true; $('game').hidden = false; $('strip').hidden = false; $('signin').hidden = true;
+  renderRound();
+}
+
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const api = (path, opts = {}) => fetch(`${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${path}`, {
+  ...opts,
+  headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+}).then(async r => {
+  const body = await r.text();
+  if (!r.ok) throw new Error(`${r.status} ${body}`);
+  return body ? JSON.parse(body) : null;
+});
+
+let lastEntry = null;
+
+// Saves run one at a time, in order, so a later save never lands before an earlier one.
+let saveChain = Promise.resolve();
+function setSaveState(text, warn) { $('saveState').textContent = text; $('saveState').className = warn ? 'warn' : ''; }
+function savePlayer(fields) {
+  if (!online()) return Promise.resolve(false);
+  setSaveState('Saving…');
+  saveChain = saveChain.then(() => api(`players?id=eq.${encodeURIComponent(playerKey)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(fields) }))
+    .then(() => { setSaveState('Saved'); return true; })
+    .catch(e => { console.error(e); setSaveState('Not saved. Check your connection.', true); return false; });
+  return saveChain;
+}
+
+async function saveAndRank(mine) {
+  $('boardStatus').textContent = '';
+  if (!online()) {
+    $('rankLine').textContent = 'Leaderboard not set up';
+    $('boardStatus').textContent = 'Add the Supabase project URL and key at the top of the script to save scores.';
+    return;
+  }
+  myDocId = playerKey;
+  lastEntry = { id: playerKey, name: player, mse: +mine.mse.toFixed(6), mae: +mine.mae.toFixed(4), score: mine.pts };
+  if (!state.saved) {
+    state.saved = true;
+    $('rankLine').textContent = 'Saving your score…'; $('boardBody').innerHTML = '';
+    const ok = await savePlayer({ guesses: state.guesses, finished: true, mse: lastEntry.mse, mae: lastEntry.mae, score: lastEntry.score });
+    if (!ok) { state.saved = false; $('rankLine').textContent = 'Score not saved yet'; $('boardStatus').textContent = 'Your final score could not be saved. Check your connection, then press Refresh leaderboard.'; return; }
+  }
+  loadBoard();
+}
+
+async function loadBoard() {
+  try {
+    const rows = await api(`players?select=id,name,mse,mae,score,seed&seed=eq.${SEED}&finished=is.true&order=mse.asc&limit=1000`);
+    renderBoard({ docs: rows.map(r => ({ id: r.id, data: () => r })) }, lastEntry);
+  } catch (e) {
+    console.error(e);
+    $('rankLine').textContent = 'Leaderboard unavailable';
+    $('boardStatus').textContent = 'The leaderboard could not load. Press Refresh leaderboard to try again.';
+  }
+}
+
+function renderBoard(snap, mine) {
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => r.seed === SEED && typeof r.mse === 'number');
+  if (myDocId && !rows.some(r => r.id === myDocId)) rows.push({ id: myDocId, ...mine });
+  if (!myDocId) rows.push({ id: '_me', ...mine });
+  rows.sort((a, b) => a.mse - b.mse);
+  const meId = myDocId || '_me';
+  const myIdx = rows.findIndex(r => r.id === meId);
+  const rank = rows.filter(r => r.mse < mine.mse).length + 1, n = rows.length;
+  const beat = n > 1 ? Math.round((rows.filter(r => r.mse > mine.mse).length / (n - 1)) * 100) : 100;
+  $('rankLine').textContent = n === 1 ? 'You are the first on the board.' : `You rank #${rank} of ${n}, ahead of ${beat}% of players.`;
+  const show = rows.slice(0, 10);
+  if (myIdx >= 10) show.push(rows[myIdx]);
+  $('boardBody').innerHTML = show.map(r => {
+    const i = rows.indexOf(r), rk = rows.filter(x => x.mse < r.mse).length + 1;
+    return `<tr class="${r.id === meId ? 'me' : ''}"><td class="num">${rk}</td><td class="nm">${esc(r.name || 'Anonymous')}${r.id === meId ? ' (you)' : ''}</td><td class="num">${r.mse.toFixed(4)}</td><td class="num">${typeof r.mae === 'number' ? r.mae.toFixed(3) : '–'}</td><td class="num">${r.score ?? '–'}</td></tr>`;
+  }).join('');
+}
+
+const NAME_OK = /^[\p{L}\p{N} _.'-]{1,24}$/u;
+$('nameForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const n = $('nameInput').value.trim().replace(/\s+/g, ' ');
+  if (!n) { $('nameNote').textContent = 'Enter a name to start, or the name you used before to continue.'; return; }
+  if (!NAME_OK.test(n)) { $('nameNote').textContent = 'Use up to 24 letters, numbers, spaces, or . _ \' -'; return; }
+  player = n; playerKey = n.toLowerCase();
+  let guesses = null, finished = false;
+  if (online()) {
+    $('nameBtn').disabled = true; $('nameNote').textContent = 'Signing in…';
+    try {
+      const found = await api(`players?select=name,guesses,finished&id=eq.${encodeURIComponent(playerKey)}`);
+      if (found.length) {
+        player = found[0].name; finished = found[0].finished;
+        guesses = (found[0].guesses || []).map(g => typeof g === 'number' ? g : null);
+        if (guesses.length !== 26) guesses = null;
+      } else {
+        await api('players', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ id: playerKey, name: player, guesses: Array(26).fill(null), seed: SEED }) });
+      }
+    } catch (err) {
+      console.error(err);
+      $('nameNote').textContent = 'Could not reach the leaderboard. Check your connection and try again.';
+      $('nameBtn').disabled = false;
+      return;
+    }
+    $('nameBtn').disabled = false; $('nameNote').textContent = '';
+  }
+  $('playerName').textContent = player; $('playerBox').hidden = false;
+  const done = guesses ? guesses.filter(g => g != null).length : 0;
+  setSaveState(done ? `Welcome back · ${done} of 26 saved` : online() ? 'New player' : 'Offline: progress not saved', !online());
+  newGame(guesses);
+  if (finished || done === 26) { state.saved = finished; state.over = true; renderResults(); return; }
+  $('guessNum').focus(); $('guessNum').select();
+});
+
+function parseGuess(s) { const v = parseFloat(String(s).replace('−', '-').replace(',', '.')); return isFinite(v) ? Math.max(-1, Math.min(1, v)) : null; }
+
+$('guessSlider').addEventListener('input', e => setGuess(+e.target.value, 'slider'));
+$('guessNum').addEventListener('input', e => { const v = parseGuess(e.target.value); if (v != null) setGuess(v, 'num'); });
+$('guessForm').addEventListener('submit', e => {
+  e.preventDefault();
+  if (state.guesses[state.idx] == null) {
+    const v = parseGuess($('guessNum').value) ?? +$('guessSlider').value;
+    state.guesses[state.idx] = Math.round(v * 100) / 100;
+    renderRound(); $('actBtn').focus();
+    savePlayer({ guesses: state.guesses });
+  } else {
+    const n = nextOpen();
+    if (n < 0) { state.over = true; renderResults(); }
+    else { state.idx = n; renderRound(); $('guessNum').focus(); $('guessNum').select(); }
+  }
+});
+$('strip').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b || !state) return;
+  state.idx = +b.dataset.i; state.over = false;
+  $('results').hidden = true; $('game').hidden = false;
+  renderRound();
+});
+function nextOpen() { for (let k = 1; k <= 26; k++) { const j = (state.idx + k) % 26; if (state.guesses[j] == null) return j; } return -1; }
+$('boardRefresh').addEventListener('click', () => { if (!lastEntry) return; if (state.saved) loadBoard(); else saveAndRank({ mse: lastEntry.mse, mae: lastEntry.mae, pts: lastEntry.score }); });
+$('againBtn').addEventListener('click', () => { location.reload(); });
+
+function redraw() { if (!state) { if (rounds.length) drawScatter($('preview'), rounds[17], {}); return; } if (state.over) drawResultsCanvases(); else drawScatter($('plot'), rounds[state.idx], { fit: state.guesses[state.idx] != null }); }
+window.addEventListener('resize', redraw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
+new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// Refreshing always returns to the sign-in screen; signing in with the same name restores saved guesses.
+const boot = () => { build(SEED); redraw(); $('nameInput').focus(); };
+Promise.race([document.fonts.load('600 190px "Archivo"'), new Promise(r => setTimeout(r, 2500))]).catch(() => {}).then(boot);
+</script>
+</body>
+</html>
